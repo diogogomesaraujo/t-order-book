@@ -91,7 +91,8 @@ showTOrderBook :: (Ord c, Show c) => TOrderBook c -> STM String
 showTOrderBook ordBook = do
     bidOrds <- showTPriorityQueue $ bidOrders ordBook
     askOrds <- showTPriorityQueue $ askOrders ordBook
-    return   $ show (bidOrds, askOrds)
+    clk     <- readTVar $ clock ordBook
+    return   $ show (bidOrds, askOrds, clk)
 
 --
 -- Testing
