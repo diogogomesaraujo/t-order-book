@@ -87,19 +87,19 @@ removeTOrderBook t ordBook = do
         Buy  -> pollTPriorityQueue $ bidOrders ordBook
         Sell -> pollTPriorityQueue $ askOrders ordBook
 
-showTOrderBook :: (Ord c, Show c) => TOrderBook c -> STM String
+showTOrderBook :: (Ord c, Show c) => TOrderBook c -> IO String
 showTOrderBook ordBook = do
     bidOrds <- showTPriorityQueue $ bidOrders ordBook
     askOrds <- showTPriorityQueue $ askOrders ordBook
-    clk     <- readTVar $ clock ordBook
+    clk     <- atomically $ readTVar $ clock ordBook
     return   $ show (bidOrds, askOrds, clk)
 
 --
 -- Testing
 --
 
-instance (Ord c, Arbitrary c) => Arbitrary (Header c) where
+instance (Ord c, Num c, Arbitrary c) => Arbitrary (Header c) where
     arbitrary = do
         ordType        <- arbitrary
-        ordLimitAmount <- arbitrary
+        ordLimitAmount <- arbitrary `suchThat` (> 0)
         return $ newHeader ordType ordLimitAmount

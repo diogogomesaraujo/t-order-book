@@ -27,7 +27,7 @@ pollTPriorityQueue q = do
         Nothing ->
             return Nothing
 
-showTPriorityQueue :: (Ord v, Show v) => TPriorityQueue v -> STM String
+showTPriorityQueue :: (Ord v, Show v) => TPriorityQueue v -> IO String
 showTPriorityQueue q = do
-    pQueue <- readTVar q
+    pQueue <- atomically $ readTVar q
     return $  show (toList pQueue)
