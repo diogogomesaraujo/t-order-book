@@ -19,6 +19,8 @@ import Control.Concurrent.STM
 import Test.QuickCheck
 import Control.Concurrent
 import Test.QuickCheck.Monadic (run, monadicIO, assert)
+import Control.Monad (replicateM, replicateM_)
+import Data.Maybe (catMaybes)
 
 type Timestamp = Int
 
@@ -106,22 +108,18 @@ instance (Ord c, Num c, Arbitrary c) => Arbitrary (Header c) where
         ordLimitAmount <- arbitrary `suchThat` (> 0)
         return $ newHeader ordType ordLimitAmount
 
-propOrdered :: OrderType -> Property
-propOrdered ordType = monadicIO $ do
-    ordBook               <- run $ atomically $ newTOrderBook
-    (ord1, ord2, ord3)    <- run $ generate ((arbitrary :: Gen (Header Int, Header Int, Header Int))
-                                                `suchThat` (\(o1, o2, o3) ->
-                                                                   orderType o1 == ordType
-                                                                && orderType o2 == ordType
-                                                                && orderType o3 == ordType))
-    join                  <- run $ newEmptyMVar
-    _                     <- run $ forkIO (do
-                            _ <- atomically $ addTOrderBook ord1 ordBook
-                            _ <- atomically $ addTOrderBook ord2 ordBook
-                            putMVar join ())
-    _                     <- run $ atomically $ addTOrderBook ord3 ordBook
-    _                     <- run $ readMVar join
-    minOrd1               <- run $ atomically $ removeTOrderBook ordType ordBook
-    minOrd2               <- run $ atomically $ removeTOrderBook ordType ordBook
-    minOrd3               <- run $ atomically $ removeTOrderBook ordType ordBook
-    assert $ minOrd1 < minOrd2 && minOrd2 < minOrd3
+propOrdered :: Int -> OrderType -> Property
+propOrdered n ordType = monadicIO $ do
+    ordBook <- run $ atomically newTOrderBook
+    joins       <- run $ replicateM n $ do
+                j <- newEmptyMVar
+                _ <- forkIO $ do
+                        ord <- generate ((arbitrary :: Gen (Header Int))
+                            `suchThat` (\o -> orderType o == ordType))
+                        _       <- atomically $ addTOrderBook ord ordBook
+                        putMVar j ()
+                return j
+    _       <- run $ mapM_ takeMVar joins
+    mins    <- run $ atomically $ replicateM n (removeTOrderBook ordType ordBook)
+    assert $ foldl (\acc x -> x && acc) True
+        $ zipWith (<) mins (tail mins)
