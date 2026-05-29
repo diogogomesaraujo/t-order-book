@@ -17,14 +17,13 @@ module OrderBook ( Header,
 import TPriorityQueue
 import Control.Concurrent.STM
 import Test.QuickCheck
+import Control.Concurrent
+import Test.QuickCheck.Monadic (run, monadicIO, assert)
 
 type Timestamp = Int
 
 data OrderType = Buy | Sell
     deriving (Show, Eq)
-
-instance Arbitrary OrderType where
-    arbitrary = elements [Buy, Sell]
 
 data Header c = Header {
     orderType   :: OrderType,
@@ -98,8 +97,31 @@ showTOrderBook ordBook = do
 -- Testing
 --
 
+instance Arbitrary OrderType where
+    arbitrary = elements [Buy, Sell]
+
 instance (Ord c, Num c, Arbitrary c) => Arbitrary (Header c) where
     arbitrary = do
         ordType        <- arbitrary
         ordLimitAmount <- arbitrary `suchThat` (> 0)
         return $ newHeader ordType ordLimitAmount
+
+propOrdered :: OrderType -> Property
+propOrdered ordType = monadicIO $ do
+    ordBook               <- run $ atomically $ newTOrderBook
+    (ord1, ord2, ord3)    <- run $ generate ((arbitrary :: Gen (Header Int, Header Int, Header Int))
+                                                `suchThat` (\(o1, o2, o3) ->
+                                                                   orderType o1 == ordType
+                                                                && orderType o2 == ordType
+                                                                && orderType o3 == ordType))
+    join                  <- run $ newEmptyMVar
+    _                     <- run $ forkIO (do
+                            _ <- atomically $ addTOrderBook ord1 ordBook
+                            _ <- atomically $ addTOrderBook ord2 ordBook
+                            putMVar join ())
+    _                     <- run $ atomically $ addTOrderBook ord3 ordBook
+    _                     <- run $ readMVar join
+    minOrd1               <- run $ atomically $ removeTOrderBook ordType ordBook
+    minOrd2               <- run $ atomically $ removeTOrderBook ordType ordBook
+    minOrd3               <- run $ atomically $ removeTOrderBook ordType ordBook
+    assert $ minOrd1 < minOrd2 && minOrd2 < minOrd3

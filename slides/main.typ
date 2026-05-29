@@ -187,7 +187,7 @@
 ]
 
 #slide(title: "Modeling a transactional order book")[
-  Each order pairs a semantic header with a timestamp. The header encodes whether the order is a buy or sell request and its associated limit price:
+  Each order pairs a header with a timestamp. The header encodes whether the order is a buy or sell request and its associated limit price:
 
   ```Haskell
   data OrderType = Buy | Sell
@@ -224,10 +224,14 @@
 #slide(title: "Modeling a transactional order book")[
   Initialization creates empty transactional priority queues alongside a fresh clock, composing naturally within the `STM` monad:
   ```Haskell
-  instance Ord c => Ord (Order c) where
-      compare ordA ordB =
-      compare (limitAmount $ header ordA, timestamp ordA)
-          (limitAmount $ header ordB, timestamp ordB)
+  newTOrderBook :: Ord c => STM (TOrderBook c)
+  newTOrderBook = do
+      bidOrds <- newTPriorityQueue
+      askOrds <- newTPriorityQueue
+      clk     <- newTVar 0
+      return   $ TOrderBook { clock     = clk,
+                              bidOrders = bidOrds,
+                              askOrders = askOrds }
   ```
 ]
 
