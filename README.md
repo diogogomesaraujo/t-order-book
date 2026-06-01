@@ -1,7 +1,7 @@
 <div align="center">
   <h3 align="center">t-order-book</h3>
   <p align="center">
-    An STM case study for Advanced Topics in Functional Programming
+    STM case study for Advanced Topics in Functional Programming
   </p>
 </div>
 
